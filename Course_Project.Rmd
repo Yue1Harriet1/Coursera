@@ -1,0 +1,100 @@
+Practical Machine Learning JHU Coursera Course Project
+=======================================================
+---
+author: Yue Harriet Huang; date: December 2014
+---
+
+<span style="font-size: 1em;">
+This project needs the following R packages:
+</span>
+<span style="font-size: 2em;">
+- install.packages("RCurl")
+</span>
+<span style="font-size: 2em;">
+- install.packages("rmarkdown")
+</span>
+install.packages("caret")
+install.packages("randomForest")
+
+
+
+```{r, message=FALSE, results='hide'}
+library(RCurl)
+library(rmarkdown)
+
+train_url = getURL("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+test_url = getURL("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+
+train = read.csv(text = train_url, na.strings = c("NA", "#DIV/0!", ""))
+summary(train)
+```
+
+Data Exploration for Missing Value
+----------------------------------------
+Firstly we import the data and take a rough look at the overall picture and run **summary(train)** command afterwards, we find that variables that have missing values are encoded as either **"#DIV/0!"**, or **"NA"**.
+
+Data Cleaning
+----------------------------------------
+# 1. Clear out variables that are almost constant
+```{r, message=FALSE}
+library(caret)
+var.constant = nearZeroVar(train)
+print("Here are the variables that are almost constant:")
+colnames(train)[var.constant]
+
+print("We pick those variables that have variances significantly bigger than 0 in training models:")
+train.new = train[, -var.constant, drop=FALSE]
+print("We can take a look at the remaining variables:")
+colnames(train.new)
+
+
+
+
+```
+
+# 2. We cut off the index variable denoted as **X** in **train.new**
+```{r, message=FALSE}
+train.new = train.new[, -1, drop=FALSE]
+```
+
+
+# 3. Response Variable Distribution
+
+We identify that the **classe** variable is our response variable and we will take a look at its distribution first:
+
+```{r, message=FALSE}
+print("Absolute Quantity")
+table = table(train$classe)
+table
+
+print("Probability Distribution")
+prob = table/sum(table)
+prob
+```
+We consider that the probability distribution of the response variable is considered relatively balanced and we noticed that there is no missing value in the response variable.
+
+Missing Value Treatment
+-------------------------------------------------------------------
+We use **rfImpute** to handle missing values in predictors.
+
+```{r, message=FALSE}
+library(randomForest)
+formula = classe ~ .
+train.imputed = rfImpute(formula, train.new)
+
+```
+
+How do I make Cross-Validation
+--------------------------------------------------------------------
+Split the training dataset as names **train** above into 60% as **train.split** and 40% as **test.split**
+
+```{r, message=FALSE}
+library(caret)
+train.ind = createDataPartition(y=train$class, p=0.6, list=FALSE) # create index of training set
+train.split = train[train.ind, ]
+test.split = train[-train.ind, ]
+
+```
+
+The Expected Out of Sample Error
+---------------------------------------------------------------------
