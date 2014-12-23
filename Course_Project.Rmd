@@ -4,17 +4,10 @@ Practical Machine Learning JHU Coursera Course Project
 author: Yue Harriet Huang; date: December 2014
 ---
 
-<span style="font-size: 1em;">
-This project needs the following R packages:
-</span>
-<span style="font-size: 2em;">
-- install.packages("RCurl")
-</span>
-<span style="font-size: 2em;">
-- install.packages("rmarkdown")
-</span>
+install.packages("RCurl")
 install.packages("caret")
 install.packages("randomForest")
+install.packages("rmarkdown")
 
 
 
@@ -22,10 +15,11 @@ install.packages("randomForest")
 library(RCurl)
 library(rmarkdown)
 
-train_url = getURL("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
-test_url = getURL("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+train_url = getURL("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+test_url = getURL("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
 
 train = read.csv(text = train_url, na.strings = c("NA", "#DIV/0!", ""))
+testing = read.csv(text = test_url, na.strings = c("NA", "#DIV/0!", ""))
 summary(train)
 ```
 
@@ -33,7 +27,7 @@ Data Exploration for Missing Value
 ----------------------------------------
 Firstly we import the data and take a rough look at the overall picture and run **summary(train)** command afterwards, we find that variables that have missing values are encoded as either **"#DIV/0!"**, or **"NA"**.
 
-Data Cleaning
+# Data Cleaning
 ----------------------------------------
 # 1. Clear out variables that are almost constant
 ```{r, message=FALSE}
@@ -44,11 +38,6 @@ colnames(train)[var.constant]
 
 print("We pick those variables that have variances significantly bigger than 0 in training models:")
 train.new = train[, -var.constant, drop=FALSE]
-print("We can take a look at the remaining variables:")
-colnames(train.new)
-
-
-
 
 ```
 
@@ -73,28 +62,66 @@ prob
 ```
 We consider that the probability distribution of the response variable is considered relatively balanced and we noticed that there is no missing value in the response variable.
 
-Missing Value Treatment
--------------------------------------------------------------------
-We use **rfImpute** to handle missing values in predictors.
-
-```{r, message=FALSE}
-library(randomForest)
-formula = classe ~ .
-train.imputed = rfImpute(formula, train.new)
-
-```
-
 How do I make Cross-Validation
 --------------------------------------------------------------------
 Split the training dataset as names **train** above into 60% as **train.split** and 40% as **test.split**
 
 ```{r, message=FALSE}
 library(caret)
-train.ind = createDataPartition(y=train$class, p=0.6, list=FALSE) # create index of training set
-train.split = train[train.ind, ]
-test.split = train[-train.ind, ]
+train.ind = createDataPartition(y=train.new$classe, p=0.6, list=FALSE) # create index of training set
+train.split = train.new[train.ind, ]
+test.split = train.new[-train.ind, ]
 
 ```
 
+
+
+Missing Value Treatment
+-------------------------------------------------------------------
+We are going to delete those predictors that have missing values.
+Firstly, on the training split **train.split** and then we do the same on the testing split **test.split**
+
+```{r, message=FALSE}
+library(randomForest)
+formula = classe ~ .
+is.na(train.split)
+```
+
+
+Model Building: Random Forest
+--------------------------------------------------
+We will be using the package **"randomForest"**
+
+```{r, message=FALSE}
+# model.forest = randomForest(formula, data = train.imputed)
+```
+
+We make predictions on the dataset **test.imputed**
+
+```{r, message=FALSE}
+# pred.forest = predict(model.forest, test.imputed, type = "class")
+```
 The Expected Out of Sample Error
 ---------------------------------------------------------------------
+
+```{r, message=FALSE}
+confusionMatrix(pred.forest, test.imputed$classe)
+```
+
+Submission
+---------------------------------------------------------------------
+
+```{r, message=FALSE}
+pred.test = predict(model.forest, testing, type = "class")
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(pred.test)
+
+```
