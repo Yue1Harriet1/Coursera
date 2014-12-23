@@ -8,6 +8,7 @@ install.packages("RCurl")
 install.packages("caret")
 install.packages("randomForest")
 install.packages("rmarkdown")
+install.packages("e1071")
 
 
 
@@ -20,7 +21,7 @@ test_url = getURL("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testi
 
 train = read.csv(text = train_url, na.strings = c("NA", "#DIV/0!", ""))
 testing = read.csv(text = test_url, na.strings = c("NA", "#DIV/0!", ""))
-summary(train)
+
 ```
 
 Data Exploration for Missing Value
@@ -39,11 +40,21 @@ colnames(train)[var.constant]
 print("We pick those variables that have variances significantly bigger than 0 in training models:")
 train.new = train[, -var.constant, drop=FALSE]
 
+###############################################
+# We do the same to dataset testing           #
+###############################################
+
+var.constant.t = nearZeroVar(testing)
+# Remove variables almost constant from the predictors
+testing.new = testing[, -var.constant.t, drop=FALSE]
+
 ```
 
-# 2. We cut off the index variable denoted as **X** in **train.new**
+# 2. We cut off the index variable denoted as **X** from **train.new** and from **testing.new**
 ```{r, message=FALSE}
 train.new = train.new[, -1, drop=FALSE]
+
+testing.new = testing.new[, -1, drop=FALSE]
 ```
 
 
@@ -57,14 +68,67 @@ table = table(train$classe)
 table
 
 print("Probability Distribution")
-prob = table/sum(table)
-prob
+prop.table(table)
+
 ```
-We consider that the probability distribution of the response variable is considered relatively balanced and we noticed that there is no missing value in the response variable.
+We consider that the probability distribution of the response variable is regarded relatively balanced and we noticed that there is no missing value in the response variable.
+
+Missing Value Treatment
+-------------------------------------------------------------------
+We are going to delete those predictors that have missing values and at the same time we will also delete variables with missing values from the **testing.new** dataset.
+Firstly we identify variables that contain missing values
+
+```{r, message=FALSE}
+
+# return var index that contains missing values 
+contain_NA = function(dataset){
+  var = c()
+  for (i in 1:ncol(dataset)){
+    vec = is.na(dataset[, i])
+    if (any(vec == TRUE)){ 
+      var = c(var, i) 
+    } 
+  }
+  return(var) 
+}
+
+# These are the variabls that have missing values
+delete = contain_NA(train.new)
+
+delete.t = contain_NA(testing.new)
+
+# Delete the variables with missing values from the predictor list
+
+train.new = train.new[, -delete, drop=FALSE]
+
+# We find that there is no missing value contained in testing.new
+
+delete.t
+
+
+# Check if the dataset has any missing value now
+
+check_NA = function(dataset){
+  out = FALSE
+  for (i in 1:ncol(dataset)){  
+    vec = is.na(dataset[, 1])
+    if (any(vec == TRUE)){ 
+      out = TRUE
+    }
+  }
+  return(out)
+}
+
+# Returns TRUE if the dataset still contains missing values and FALSE otherwise
+check_NA(train.new)
+
+check_NA(testing.new)
+
+```
 
 How do I make Cross-Validation
 --------------------------------------------------------------------
-Split the training dataset as names **train** above into 60% as **train.split** and 40% as **test.split**
+Split the training dataset as names **train.new** above into 60% as **train.split** and 40% as **test.split**
 
 ```{r, message=FALSE}
 library(caret)
@@ -75,37 +139,36 @@ test.split = train.new[-train.ind, ]
 ```
 
 
-
-Missing Value Treatment
--------------------------------------------------------------------
-We are going to delete those predictors that have missing values.
-Firstly, on the training split **train.split** and then we do the same on the testing split **test.split**
-
-```{r, message=FALSE}
-library(randomForest)
-formula = classe ~ .
-is.na(train.split)
-```
-
+Feature Selectiong
+--------------------------------------------------
+formula = classe~.
+feature.model
 
 Model Building: Random Forest
 --------------------------------------------------
 We will be using the package **"randomForest"**
 
 ```{r, message=FALSE}
-# model.forest = randomForest(formula, data = train.imputed)
+library(randomForest)
+formula = classe~.
+model.forest = randomForest(formula, data = train.split)
 ```
 
 We make predictions on the dataset **test.imputed**
 
 ```{r, message=FALSE}
-# pred.forest = predict(model.forest, test.imputed, type = "class")
+pred.forest = predict(model.forest, test.split, type = "class")
+
+# We can do a premilinary check on accuracy
+table(pred.forest, test.split$classe)
+
+sum(test.split$classe == pred.forest)/nrow(test.split)
 ```
 The Expected Out of Sample Error
 ---------------------------------------------------------------------
 
 ```{r, message=FALSE}
-confusionMatrix(pred.forest, test.imputed$classe)
+confusionMatrix(pred.forest, test.split[, ncol(test.split)])
 ```
 
 Submission
